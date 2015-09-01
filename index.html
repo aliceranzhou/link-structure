@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<style>
+body {
+  font: 10px sans-serif;
+}
+
+.link {
+  stroke: #00CED1;
+  stroke-width: 0.2px;
+}
+
+.node {
+  cursor: move;
+  fill: #ccc;
+  stroke: #000;
+  stroke-width: 0.5px;
+  font
+}
+
+.node.fixed {
+  fill: #f00;
+()}
+</style>
+
+<body>
+
+<h1>Visualization of the Canadian Political Parties and Political Interest Groups Link Structures</h1>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script>
+
+var width = 1024, height = 500;
+
+var force = d3.layout.force()
+  .size([width, height])
+    .linkStrength(0.5)
+    .friction(0.1)
+    .charge(-150)
+    .linkDistance(60)
+    .gravity(0.8)
+    .theta(0.8)
+  .on("tick", tick);
+
+var drag = force.drag()
+  .on("dragstart", dragstart);
+
+var svg = d3.select("body").append("svg")
+  .attr("width", width)
+  .attr("height", height);
+
+var link = svg.selectAll(".link");
+var node = svg.selectAll(".node");
+
+d3.csv("data.csv", function(error, data) {
+  var links = [];
+  var nodes = {};
+
+  data.forEach(function(d){
+    links.push(d);
+  });
+
+  links.forEach(function(l) {
+    l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
+    l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
+  });
+
+  force.nodes(d3.values(nodes))
+    .links(links)
+    .start();
+
+  node = node.data(force.nodes())
+    .enter().append("circle")
+    .attr("class", "node")
+    .attr("r", 3)
+    .on("dblclick", dblclick)
+    .call(drag);
+
+  node.append("text")
+      .attr("dx", 5)
+      .attr("dy", ".35em")
+    .text(function(d) { return d.name; })
+
+  link = link.data(force.links())
+    .enter().append("line")
+    .attr("class", "link");
+});
+
+function tick() {
+  link.attr("x1", function(d) { return d.source.x; })
+    .attr("y1", function(d) { return d.source.y; })
+    .attr("x2", function(d) { return d.target.x; })
+    .attr("y2", function(d) { return d.target.y; });
+
+  node.attr("cx", function(d) { return d.x; })
+    .attr("cy", function(d) { return d.y; });
+}
+
+function dblclick(d) {
+  d3.select(this).classed("fixed", d.fixed = false);
+}
+
+function dragstart(d) {
+  d3.select(this).classed("fixed", d.fixed = true);
+}
+
+</script>
+
+    <p>This visualization was created with d3, based on <a href="http://bl.ocks.org/mbostock/3750558">this example</a> and <a href="http://bl.ocks.org/mbostock/2706022">this example</a>. The raw data for this visualization comes from the output of a <a href="https://github.com/lintool/warcbase/wiki/Pig:-Analysis-of-Site-Link-Structure">Pig script</a>.</p>
+
+</html>
