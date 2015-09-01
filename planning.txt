@@ -1,0 +1,15 @@
+Data:
+year/month, source, target, count
+
+1. jsimple force directed graph with source and target
+  process raw.txt into a data.csv without dates
+2. force directed graph with links that are coloured based on connection count overall
+3. build force-directed graph, use time slider that only shows nodes/links in that time
+
+How to show count?
+
+- Colour of lines, thickness of lines
+
+How to show change over time?
+
+- Slider for time, links change based on time?
