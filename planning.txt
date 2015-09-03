@@ -1,15 +1,34 @@
 Data:
-year/month, source, target, count
-
-1. jsimple force directed graph with source and target
-  process raw.txt into a data.csv without dates
-2. force directed graph with links that are coloured based on connection count overall
-3. build force-directed graph, use time slider that only shows nodes/links in that time
-
-How to show count?
-
-- Colour of lines, thickness of lines
+date, source, target, count
 
 How to show change over time?
 
 - Slider for time, links change based on time?
+
+Thresholding: take top n domains, based on count
+
+(1) nodes color coded (e.g., liberal and affiliated sites in one color, conservative in another, news in third, social media in fourth, etc.)
+
+(2) thickness of edge represents # of links
+
+(3) layout the initial graph with everything (i.e., disregard temporal dimension), then fix layout
+
+(4) have a slider bar in years: as you slide through the years, the data relevant to that year shows, everything else is hidden.
+
+
+date
+source
+target
+count
+
+#link
+
+date <- per link
+source
+target
+count <- per link
+
+#node
+
+name (source)
+threshold (by count?)

@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html>
-<meta charset="utf-8">
+<meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1">
+<!-- Latest compiled and minified CSS -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+<!-- Optional theme -->
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+<!-- Latest compiled and minified JavaScript -->
 <style>
 body {
   font: 10px sans-serif;
@@ -11,7 +16,7 @@ body {
   stroke-width: 0.2px;
 }
 
-.node {
+.node circle{
   cursor: move;
   fill: #ccc;
   stroke: #000;
@@ -22,21 +27,42 @@ body {
 .node.fixed {
   fill: #f00;
 ()}
+
+.sidebar {
+ height:100vh;
+ background-color: #eee;
+}
 </style>
 
 <body>
 
 <h1>Visualization of the Canadian Political Parties and Political Interest Groups Link Structures</h1>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<div class="container-fluid">
+  <div class="row" id="entire">
+    <div class="sidebar col-md-3">
+      <h5> Max number of links to display </h5>
+      <input id="threshold-links" type="number" class="form-control" placeholder="100">
+    </div>
+    <div class="col-md-9" id="display">
+      <div id="graph">
+      </div>
+      <p>This visualization was created with d3, based on <a href="http://bl.ocks.org/mbostock/3750558">this example</a> and <a href="http://bl.ocks.org/mbostock/2706022">this example</a>. The raw data for this visualization comes from the output of a <a href="https://github.com/lintool/warcbase/wiki/Pig:-Analysis-of-Site-Link-Structure">Pig script</a>.</p>
+    </div>
+  </div>
+</div>
 <script>
 
-var width = 1024, height = 500;
+var width = document.getElementById("display").offsetWidth;
+var height = document.getElementById("entire").offsetHeight;
 
 var force = d3.layout.force()
   .size([width, height])
     .linkStrength(0.5)
     .friction(0.1)
-    .charge(-150)
+    .charge(-200)
     .linkDistance(60)
     .gravity(0.8)
     .theta(0.8)
@@ -45,46 +71,64 @@ var force = d3.layout.force()
 var drag = force.drag()
   .on("dragstart", dragstart);
 
-var svg = d3.select("body").append("svg")
+var svg = d3.select("#graph").append("svg")
   .attr("width", width)
-  .attr("height", height);
+  .attr("height", height)
 
 var link = svg.selectAll(".link");
 var node = svg.selectAll(".node");
 
-d3.csv("data.csv", function(error, data) {
-  var links = [];
-  var nodes = {};
+var links = [];
 
-  data.forEach(function(d){
-    links.push(d);
+var threshold = 1000000;
+
+start();
+
+function start(){
+  d3.csv("data.csv", function(error, data) {
+    data.sort(function(l1, l2) {return l2.count - l1.count;});
+    links = data.slice(0, threshold);
+
+    var nodes = {};
+    links.forEach(function(l) {
+      l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
+      l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
+    });
+
+    force.nodes(d3.values(nodes))
+      .links(links)
+      .start();
+
+    node = node.data(force.nodes());
+
+    var nodeEnter = node.enter().append("g")
+      .attr("class", "node")
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout)
+      .call(force.drag);
+
+    nodeEnter.append("circle")
+      .attr("r", 3);
+
+
+    node.exit().remove();
+
+    link = link.data(force.links());
+    link.enter().append("line")
+      .attr("stroke-width", function(d){ return d.count / 10; })
+      .attr("class", "link");
+    link.exit().remove();
   });
+}
 
-  links.forEach(function(l) {
-    l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
-    l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
-  });
-
-  force.nodes(d3.values(nodes))
-    .links(links)
-    .start();
-
-  node = node.data(force.nodes())
-    .enter().append("circle")
-    .attr("class", "node")
-    .attr("r", 3)
-    .on("dblclick", dblclick)
-    .call(drag);
-
-  node.append("text")
-      .attr("dx", 5)
-      .attr("dy", ".35em")
-    .text(function(d) { return d.name; })
-
-  link = link.data(force.links())
-    .enter().append("line")
-    .attr("class", "link");
+d3.select("#threshold-links").on("input", function() {
+  updateThreshold(+this.value);
 });
+
+function updateThreshold(t) {
+  threshold = t;
+  start();
+}
 
 function tick() {
   link.attr("x1", function(d) { return d.source.x; })
@@ -92,8 +136,7 @@ function tick() {
     .attr("x2", function(d) { return d.target.x; })
     .attr("y2", function(d) { return d.target.y; });
 
-  node.attr("cx", function(d) { return d.x; })
-    .attr("cy", function(d) { return d.y; });
+  node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 }
 
 function dblclick(d) {
@@ -104,8 +147,16 @@ function dragstart(d) {
   d3.select(this).classed("fixed", d.fixed = true);
 }
 
+function mouseover(d) {
+  d3.select(this).append("text")
+    .attr("dx", 5)
+    .attr("dy", ".35em")
+    .text(function(d) { return d.name; });
+}
+
+function mouseout(d) {
+  d3.select(this).remove("text");
+}
+
 </script>
-
-    <p>This visualization was created with d3, based on <a href="http://bl.ocks.org/mbostock/3750558">this example</a> and <a href="http://bl.ocks.org/mbostock/2706022">this example</a>. The raw data for this visualization comes from the output of a <a href="https://github.com/lintool/warcbase/wiki/Pig:-Analysis-of-Site-Link-Structure">Pig script</a>.</p>
-
 </html>
