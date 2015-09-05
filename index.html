@@ -99,6 +99,9 @@ function start(){
       .links(links)
       .start();
 
+    console.log(links[0].count);
+    console.log(links[1].count);
+    console.log(links[5].count);
     node = node.data(force.nodes());
 
     var nodeEnter = node.enter().append("g")
@@ -110,12 +113,11 @@ function start(){
     nodeEnter.append("circle")
       .attr("r", 3);
 
-
     node.exit().remove();
 
     link = link.data(force.links());
     link.enter().append("line")
-      .attr("stroke-width", function(d){ return d.count / 10; })
+      .attr("stroke-width", function(d){ return d.count; })
       .attr("class", "link");
     link.exit().remove();
   });

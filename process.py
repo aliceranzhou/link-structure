@@ -23,6 +23,8 @@ with open('raw.txt') as fp:
       arr.append(val.replace(" ", ""))
     data.append(Link(arr[0], arr[1], arr[2], int(arr[3])))
 
+sys.stdout.write("date")
+sys.stdout.write(",")
 sys.stdout.write("source")
 sys.stdout.write(",")
 sys.stdout.write("target")
