@@ -86,8 +86,16 @@ var node = svg.selectAll(".node");
 var allLinks = [];
 
 var threshold = 1000000;
+var rT = Math.log(threshold);
 
 var maxLinks = 1;
+
+var loading = svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height / 2)
+      .attr("dy", ".35em")
+      .style("text-anchor", "middle")
+      .text("Simulating. One moment please…");
 
 d3.csv("data.csv", function(error, data){
     data.sort(function(l1, l2) {return l2.count - l1.count;});
@@ -96,51 +104,55 @@ d3.csv("data.csv", function(error, data){
     start();
 });
 
-
 function start(){
-  var links = [];
-  var nodes = {};
+  setTimeout(function() {
+    loading.attr("visible", 1);
+    var links = [];
+    var nodes = {};
 
-  console.log(links);
-  for (var i=0, max=allLinks.length; i<threshold && i<max; ++i) {
-    var l = JSON.parse(JSON.stringify(allLinks[i]));
-    links.push(l);
-  }
+    for (var i=0, max=allLinks.length; i<threshold && i<max; ++i) {
+      var l = JSON.parse(JSON.stringify(allLinks[i]));
+      links.push(l);
+    }
 
-  links.forEach(function(l) {
-    l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
-    l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
+    links.forEach(function(l) {
+      l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
+      l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
+    });
+
+    force.nodes(d3.values(nodes))
+      .links(links)
+      .start();
+
+    node = node.data(force.nodes());
+
+    var nodeEnter = node.enter().append("g")
+      .attr("class", "node")
+      .call(force.drag);
+
+    nodeEnter.append("circle")
+      .attr("r", 25/parseFloat(rT));
+
+    nodeEnter.append("text")
+      .attr("class", "nodetext")
+      .attr("dx", 5)
+      .attr("dy", ".35em")
+      .text(function(d) { return d.name; });
+
+    node.exit().remove();
+
+    link = link.data(force.links());
+
+    link.enter().append("line")
+      .attr("stroke-opacity", function(d){ return Math.log(d.count)/Math.log(maxLinks); })
+      .attr("class", "link");
+
+    link.exit().remove();
+
+    for(var i=30; i>0; --i) force.tick();
+    force.stop();
+    loading.attr("visible", 0);
   });
-
-  console.log(links);
-  force.nodes(d3.values(nodes))
-    .links(links)
-    .start();
-
-  node = node.data(force.nodes());
-
-  var nodeEnter = node.enter().append("g")
-    .attr("class", "node")
-    .call(force.drag);
-
-  nodeEnter.append("circle")
-    .attr("r", 3);
-
-  nodeEnter.append("text")
-    .attr("class", "nodetext")
-    .attr("dx", 5)
-    .attr("dy", ".35em")
-    .text(function(d) { return d.name; });
-
-  node.exit().remove();
-
-  link = link.data(force.links());
-
-  link.enter().append("line")
-    //.attr("stroke-opacity", function(d){ return d.count; })
-    .attr("class", "link");
-
-  link.exit().remove();
 }
 
 d3.select("#threshold-links").on("input", function() {
@@ -149,7 +161,11 @@ d3.select("#threshold-links").on("input", function() {
 
 function updateThreshold(t) {
   threshold = t;
+  rT = Math.log(threshold);
   start();
+}
+
+function showLoading() {
 }
 
 function tick() {
@@ -166,7 +182,7 @@ function dblclick(d) {
 }
 
 function dragstart(d) {
-    d3.select(this).classed("fixed", d.fixed = true);
+  d3.select(this).classed("fixed", d.fixed = true);
 }
 
 </script>
