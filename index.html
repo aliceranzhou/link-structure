@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html>
 <meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1">
+<head>
 <!-- Latest compiled and minified CSS -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
 <!-- Optional theme -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
 <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
-<!-- Latest compiled and minified JavaScript -->
+<link rel="stylesheet" type="text/css" media="screen" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.2/themes/base/jquery-ui.css">
+<link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/css/bootstrap2/bootstrap-switch.min.css">
+
 <style>
 body {
   font: 10px sans-serif;
@@ -34,22 +37,30 @@ body {
 }
 
 .sidebar {
- height:100vh;
- background-color: #eee;
+  height:100vh;
+  background-color: #eee;
 }
-</style>
 
+.ui-datepicker-calendar {
+  display: none;
+}
+
+</style>
+</head>
 <body>
 
 <h1>Visualization of the Canadian Political Parties and Political Interest Groups Link Structures</h1>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 <div class="container-fluid">
   <div class="row" id="entire">
     <div class="sidebar col-md-3">
-      <h5> Max number of links to display </h5>
+      <label for="threshold-links"> Max number of links to display </label>
       <input id="threshold-links" type="number" class="form-control" placeholder="100">
+
+     <label for="date-enabled">Select Date</label>
+     <input name="date-enabled" id="date-switch" type="checkbox">
+
+     <div id="date-slider"></div>
+     <p class="note">Current date: <span id="currentValue">0</span></p>
     </div>
     <div class="col-md-9" id="display">
       <div id="graph">
@@ -58,6 +69,13 @@ body {
     </div>
   </div>
 </div>
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/js/bootstrap-switch.min.js"></script>
 <script>
 
 var width = document.getElementById("display").offsetWidth;
@@ -85,10 +103,16 @@ var node = svg.selectAll(".node");
 
 var allLinks = [];
 
-var threshold = 1000000;
+var threshold = 10000000;
 var rT = Math.log(threshold);
 
 var maxLinks = 1;
+
+var minDate = new Date(10000000);
+var maxDate = new Date(0);
+
+var selectDate = false;
+var thisDate = 200510;
 
 var loading = svg.append("text")
       .attr("x", width / 2)
@@ -98,15 +122,20 @@ var loading = svg.append("text")
       .text("Simulating. One moment please…");
 
 d3.csv("data.csv", function(error, data){
-    data.sort(function(l1, l2) {return l2.count - l1.count;});
-    allLinks = data.slice();
-    maxLinks = allLinks[0].count;
-    start();
+  var min = data[0].date;
+  var max = data[data.length-1].date;
+  minDate = new Date(Date.UTC(min.substring(0, 4), min.substring(4, 6)));
+  maxDate = new Date(Date.UTC(max.substring(0, 4), max.substring(4, 6)));
+  makeSlider();
+  data.sort(function(l1, l2) {return l2.count - l1.count;});
+  maxLinks = data[0].count;
+  allLinks = data.slice();
+  start();
 });
 
 function start(){
   setTimeout(function() {
-    loading.attr("visible", 1);
+    loading.attr("visibility", "visible");
     var links = [];
     var nodes = {};
 
@@ -124,39 +153,53 @@ function start(){
       .links(links)
       .start();
 
-    node = node.data(force.nodes());
+    update();
 
-    var nodeEnter = node.enter().append("g")
-      .attr("class", "node")
-      .call(force.drag);
-
-    nodeEnter.append("circle")
-      .attr("r", 25/parseFloat(rT));
-
-    nodeEnter.append("text")
-      .attr("class", "nodetext")
-      .attr("dx", 5)
-      .attr("dy", ".35em")
-      .text(function(d) { return d.name; });
-
-    node.exit().remove();
-
-    link = link.data(force.links());
-
-    link.enter().append("line")
-      .attr("stroke-opacity", function(d){ return Math.log(d.count)/Math.log(maxLinks); })
-      .attr("class", "link");
-
-    link.exit().remove();
-
-    for(var i=30; i>0; --i) force.tick();
+    for(var i=25; i>0; --i) force.tick();
     force.stop();
-    loading.attr("visible", 0);
+    loading.attr("visibility", "hidden");
   });
+}
+
+function update(){
+  node = node.data(force.nodes());
+
+  var nodeEnter = node.enter().append("g")
+    .attr("class", "node")
+    .call(force.drag);
+
+  nodeEnter.append("circle")
+    .attr("r", 25/parseFloat(rT));
+
+  nodeEnter.append("text")
+    .attr("class", "nodetext")
+    .attr("dx", 5)
+    .attr("dy", ".35em")
+    .text(function(d) {
+      return d.name;
+    });
+
+  node.exit().remove();
+
+  link = link.data(force.links());
+
+  link.enter().append("line")
+    .attr("stroke-opacity", function(d) {
+      return Math.log(d.count)/Math.log(maxLinks);
+    })
+    .attr("class", function(d) { return "link date" + d.date; })
+    .attr("visibility", "visible");
+
+  link.exit().remove();
 }
 
 d3.select("#threshold-links").on("input", function() {
   updateThreshold(+this.value);
+});
+
+d3.select("#date-switch").on("change", function() {
+  selectDate = this.checked;
+  updateDate();
 });
 
 function updateThreshold(t) {
@@ -165,8 +208,30 @@ function updateThreshold(t) {
   start();
 }
 
-function showLoading() {
+function updateDate() {
+  if (selectDate) {
+    d3.selectAll(".link")
+      .attr("visibility", "hidden");
+    d3.selectAll(".date" + thisDate)
+      .attr("visibility", "visible");
+  } else {
+    d3.selectAll(".link")
+      .attr("visibility", "visible");
+  }
 }
+
+function formatDate(d){
+  var pad = "0";
+  var d = new Date(d*1000);
+  var monthString = "" + (d.getMonth()+1);
+  if (monthString.length > 1) {
+    pad = "";
+  }
+  var thisMonth = pad + monthString;
+  var thisYear = d.getFullYear();
+  thisDate = "" + thisYear + thisMonth;
+}
+
 
 function tick() {
   link.attr("x1", function(d) { return d.source.x; })
@@ -185,5 +250,28 @@ function dragstart(d) {
   d3.select(this).classed("fixed", d.fixed = true);
 }
 
+function makeSlider(){
+  $(function() {
+    var currentValue = $('#currentValue');
+    var maxTime = maxDate.getTime()/1000;
+    var minTime = minDate.getTime()/1000;
+    $("#date-slider").slider({
+      max: maxTime,
+      min: minTime,
+      slide: function(event, ui) {
+        formatDate(ui.value);
+        currentValue.html(thisDate);
+        updateDate();
+      }
+    });
+  });
+}
+
+$(function() {
+  $("#date-enabled").bootstrapSwitch();
+  updateDate();
+});
+
 </script>
+</body>
 </html>
