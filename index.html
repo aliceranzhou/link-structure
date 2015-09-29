@@ -53,14 +53,12 @@ body {
 <div class="container-fluid">
   <div class="row" id="entire">
     <div class="sidebar col-md-3">
-      <label for="threshold-links"> Max number of links to display </label>
-      <input id="threshold-links" type="number" class="form-control" placeholder="100">
-
-     <label for="date-enabled">Select Date</label>
-     <input name="date-enabled" id="date-switch" type="checkbox">
+      <label for="threshold-nodes"> Max number of sites to display </label>
+      <div id="threshold-slider"></div>
+     <p class="note">Current threshold: <span id="currentThreshold"></span></p>
 
      <div id="date-slider"></div>
-     <p class="note">Current date: <span id="currentValue">0</span></p>
+     <p class="note">Current date: <span id="currentValue"></span></p>
     </div>
     <div class="col-md-9" id="display">
       <div id="graph">
@@ -83,9 +81,9 @@ var height = document.getElementById("entire").offsetHeight;
 
 var force = d3.layout.force()
   .size([width, height])
-    .linkStrength(0.5)
+    .linkStrength(0.2)
     .friction(0.1)
-    .charge(-200)
+    .charge(-100)
     .linkDistance(60)
     .gravity(0.8)
     .theta(0.8)
@@ -102,16 +100,20 @@ var link = svg.selectAll(".link");
 var node = svg.selectAll(".node");
 
 var allLinks = [];
+var allNodes= [];
 
-var threshold = 10000000;
+var nodesToLinks = {};
+var nodesByName = {};
+
+var threshold = 100;
 var rT = Math.log(threshold);
 
 var maxLinks = 1;
+var numNodes = 1;
 
 var minDate = new Date(10000000);
 var maxDate = new Date(0);
 
-var selectDate = false;
 var thisDate = 200510;
 
 var loading = svg.append("text")
@@ -121,17 +123,39 @@ var loading = svg.append("text")
       .style("text-anchor", "middle")
       .text("Simulating. One moment please…");
 
-d3.csv("data.csv", function(error, data){
-  var min = data[0].date;
-  var max = data[data.length-1].date;
-  minDate = new Date(Date.UTC(min.substring(0, 4), min.substring(4, 6)));
-  maxDate = new Date(Date.UTC(max.substring(0, 4), max.substring(4, 6)));
-  makeSlider();
-  data.sort(function(l1, l2) {return l2.count - l1.count;});
-  maxLinks = data[0].count;
-  allLinks = data.slice();
-  start();
+d3.csv("nodes.csv", function(error, data){
+  allNodes = data.slice();
+  allNodes.forEach(function(n) {
+    nodesToLinks[n.name] = new Array();
+    nodesByName[n.name] = n;
+  });
+  numNodes = allNodes.length;
+  loadLinks();
 });
+
+function loadLinks(){
+  d3.csv("links.csv", function(error, data){
+    var min = data[0].date;
+    var max = data[data.length-1].date;
+    minDate = new Date(Date.UTC(min.substring(0, 4), min.substring(4, 6)));
+    maxDate = new Date(Date.UTC(max.substring(0, 4), max.substring(4, 6)));
+    makeSlider();
+    makeThresholdSlider();
+    maxLinks = data[0].count;
+    allLinks = data.slice();
+    allLinks.forEach(function(l) {
+      var sourceString = l.source;
+      var targetString = l.target;
+      l.source = nodesByName[l.source]
+      l.target = nodesByName[l.target]
+      nodesToLinks[sourceString].push(l);
+      if (sourceString != targetString) {
+        nodesToLinks[targetString].push(l);
+      }
+    });
+    start();
+  });
+}
 
 function start(){
   setTimeout(function() {
@@ -139,15 +163,18 @@ function start(){
     var links = [];
     var nodes = {};
 
-    for (var i=0, max=allLinks.length; i<threshold && i<max; ++i) {
-      var l = JSON.parse(JSON.stringify(allLinks[i]));
-      links.push(l);
+    for (var i=0; i<threshold && i<allNodes.length; ++i) {
+      var n = allNodes[i];
+      n.px = i
+      n.py = i
+      var linkArray = nodesToLinks[n.name]
+      for (var j=0; j<linkArray.length; ++j){
+        var l = linkArray[j]
+        if(!nodes[l.source.name]) nodes[l.source.name] = l.source
+        if(!nodes[l.target.name]) nodes[l.target.name] = l.target
+        links.push(l)
+      }
     }
-
-    links.forEach(function(l) {
-      l.source = nodes[l.source] || (nodes[l.source] = {name: l.source});
-      l.target = nodes[l.target] || (nodes[l.target] = {name: l.target});
-    });
 
     force.nodes(d3.values(nodes))
       .links(links)
@@ -155,9 +182,9 @@ function start(){
 
     update();
 
-    for(var i=25; i>0; --i) force.tick();
-    force.stop();
-    loading.attr("visibility", "hidden");
+   for(var i=200; i>0; --i) force.tick();
+   force.stop();
+   loading.attr("visibility", "hidden");
   });
 }
 
@@ -169,7 +196,7 @@ function update(){
     .call(force.drag);
 
   nodeEnter.append("circle")
-    .attr("r", 25/parseFloat(rT));
+    .attr("r", 3);
 
   nodeEnter.append("text")
     .attr("class", "nodetext")
@@ -193,31 +220,16 @@ function update(){
   link.exit().remove();
 }
 
-d3.select("#threshold-links").on("input", function() {
-  updateThreshold(+this.value);
-});
-
-d3.select("#date-switch").on("change", function() {
-  selectDate = this.checked;
-  updateDate();
-});
-
-function updateThreshold(t) {
-  threshold = t;
+function updateThreshold() {
   rT = Math.log(threshold);
   start();
 }
 
 function updateDate() {
-  if (selectDate) {
-    d3.selectAll(".link")
-      .attr("visibility", "hidden");
-    d3.selectAll(".date" + thisDate)
-      .attr("visibility", "visible");
-  } else {
-    d3.selectAll(".link")
-      .attr("visibility", "visible");
-  }
+  d3.selectAll(".link")
+    .attr("visibility", "hidden");
+  d3.selectAll(".date" + thisDate)
+    .attr("visibility", "visible");
 }
 
 function formatDate(d){
@@ -232,7 +244,6 @@ function formatDate(d){
   thisDate = "" + thisYear + thisMonth;
 }
 
-
 function tick() {
   link.attr("x1", function(d) { return d.source.x; })
     .attr("y1", function(d) { return d.source.y; })
@@ -242,10 +253,10 @@ function tick() {
   node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 }
 
-function dblclick(d) {
-  d3.select(this).classed("fixed", d.fixed = false);
-}
-
+//function dblclick(d) {
+//  d3.select(this).classed("fixed", d.fixed = false);
+//}
+//
 function dragstart(d) {
   d3.select(this).classed("fixed", d.fixed = true);
 }
@@ -262,16 +273,33 @@ function makeSlider(){
         formatDate(ui.value);
         currentValue.html(thisDate);
         updateDate();
+      },
+      pips: {
+        mode: 'range',
+        density: 3
       }
     });
   });
 }
 
-$(function() {
-  $("#date-enabled").bootstrapSwitch();
-  updateDate();
-});
-
+function makeThresholdSlider(){
+  $(function() {
+    var currentThreshold = $('#currentThreshold');
+    $("#threshold-slider").slider({
+      max: numNodes,
+      min: 0,
+      slide: function(event, ui) {
+        threshold = ui.value
+        currentThreshold.html(threshold);
+        updateThreshold();
+      },
+      pips: {
+        mode: 'range',
+        density: 3
+      }
+    });
+  });
+}
 </script>
 </body>
 </html>
