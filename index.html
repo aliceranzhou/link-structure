@@ -10,6 +10,7 @@
 <link rel="stylesheet" type="text/css" media="screen" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.2/themes/base/jquery-ui.css">
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/css/bootstrap2/bootstrap-switch.min.css">
 
+<link href="assets/nouislider.min.css" rel="stylesheet">
 <style>
 body {
   font: 10px sans-serif;
@@ -28,21 +29,21 @@ body {
   font
 }
 
-.node:not(:hover) .nodetext {
-  display: none;
-}
-
 .node.fixed {
   fill: #f00;
 }
 
-.sidebar {
-  height:100vh;
-  background-color: #eee;
+#graph {
+  height:80vh;
 }
 
-.ui-datepicker-calendar {
-  display: none;
+.popup-tip{
+  padding: 2px 4px 2px 2px;
+  border: solid #444 1px;
+  border-radius: 6px;
+  font-size: 1em;
+  background-color: rgba(255,255,255,0.85);
+  font-family: sans-serif;
 }
 
 </style>
@@ -51,16 +52,18 @@ body {
 
 <h1>Visualization of the Canadian Political Parties and Political Interest Groups Link Structures</h1>
 <div class="container-fluid">
-  <div class="row" id="entire">
-    <div class="sidebar col-md-3">
-      <label for="threshold-nodes"> Max number of sites to display </label>
-      <div id="threshold-slider"></div>
-     <p class="note">Current threshold: <span id="currentThreshold"></span></p>
-
-     <div id="date-slider"></div>
-     <p class="note">Current date: <span id="currentValue"></span></p>
-    </div>
-    <div class="col-md-9" id="display">
+  <div class="row">
+      <div class="col-md-6">
+        <label for="threshold-nodes"> Max number of sites to display </label>
+        <div id="threshold-slider"></div>
+      </div>
+      <div class="col-md-6">
+        <label for="threshold-nodes"> Year </label>
+        <div id="date-slider"></div>
+      </div>
+  </div>
+  <div class="row">
+    <div id="display">
       <div id="graph">
       </div>
       <p>This visualization was created with d3, based on <a href="http://bl.ocks.org/mbostock/3750558">this example</a> and <a href="http://bl.ocks.org/mbostock/2706022">this example</a>. The raw data for this visualization comes from the output of a <a href="https://github.com/lintool/warcbase/wiki/Pig:-Analysis-of-Site-Link-Structure">Pig script</a>.</p>
@@ -74,16 +77,18 @@ body {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/js/bootstrap-switch.min.js"></script>
+<script src="assets/nouislider.min.js"></script>
+<script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
 <script>
 
-var width = document.getElementById("display").offsetWidth;
-var height = document.getElementById("entire").offsetHeight;
+var width = document.getElementById("graph").offsetWidth;
+var height = document.getElementById("graph").offsetHeight;
 
 var force = d3.layout.force()
   .size([width, height])
-    .linkStrength(0.2)
+    .linkStrength(0.5)
     .friction(0.1)
-    .charge(-100)
+    .charge(-200)
     .linkDistance(60)
     .gravity(0.8)
     .theta(0.8)
@@ -111,10 +116,10 @@ var rT = Math.log(threshold);
 var maxLinks = 1;
 var numNodes = 1;
 
-var minDate = new Date(10000000);
-var maxDate = new Date(0);
+var minYear = 2005;
+var maxYear = 2009;
 
-var thisDate = 200510;
+var thisYear = 2005;
 
 var loading = svg.append("text")
       .attr("x", width / 2)
@@ -122,6 +127,12 @@ var loading = svg.append("text")
       .attr("dy", ".35em")
       .style("text-anchor", "middle")
       .text("Simulating. One moment please…");
+
+var tip = d3.tip()
+   .attr('class', 'd3-tip')
+   .offset([-10, 0])
+  .html(function(d) { return "<div class='popup-tip'>" + d.name + "</div>"; });
+svg.call(tip);
 
 d3.csv("nodes.csv", function(error, data){
   allNodes = data.slice();
@@ -135,10 +146,6 @@ d3.csv("nodes.csv", function(error, data){
 
 function loadLinks(){
   d3.csv("links.csv", function(error, data){
-    var min = data[0].date;
-    var max = data[data.length-1].date;
-    minDate = new Date(Date.UTC(min.substring(0, 4), min.substring(4, 6)));
-    maxDate = new Date(Date.UTC(max.substring(0, 4), max.substring(4, 6)));
     makeSlider();
     makeThresholdSlider();
     maxLinks = data[0].count;
@@ -163,6 +170,10 @@ function start(){
     var links = [];
     var nodes = {};
 
+    var nodeNames = new Set();
+    for (var i=0; i<threshold && i<allNodes.length; ++i) {
+      nodeNames.add(allNodes[i].name);
+    }
     for (var i=0; i<threshold && i<allNodes.length; ++i) {
       var n = allNodes[i];
       n.px = i
@@ -170,9 +181,11 @@ function start(){
       var linkArray = nodesToLinks[n.name]
       for (var j=0; j<linkArray.length; ++j){
         var l = linkArray[j]
-        if(!nodes[l.source.name]) nodes[l.source.name] = l.source
-        if(!nodes[l.target.name]) nodes[l.target.name] = l.target
-        links.push(l)
+        if (nodeNames.has(l.target.name)){
+          if(!nodes[l.source.name]) nodes[l.source.name] = l.source
+          if(!nodes[l.target.name]) nodes[l.target.name] = l.target
+          links.push(l)
+        }
       }
     }
 
@@ -180,9 +193,9 @@ function start(){
       .links(links)
       .start();
 
-    update();
+   update();
 
-   for(var i=200; i>0; --i) force.tick();
+   for(var i=25; i>0; --i) force.tick();
    force.stop();
    loading.attr("visibility", "hidden");
   });
@@ -192,19 +205,21 @@ function update(){
   node = node.data(force.nodes());
 
   var nodeEnter = node.enter().append("g")
-    .attr("class", "node")
+    .attr("class", function(d) {
+      var dates = new Set();
+      var s = "node ";
+      nodesToLinks[d.name].forEach(function(l) { dates.add(l.date); });
+      dates.forEach(function(year) { s += "date" + year + " "; });
+      console.log(s);
+      return s;
+    })
+    .attr("visibility", "visible")
+    .on("mouseover", tip.show)
+    .on("mouseout", tip.hide)
     .call(force.drag);
 
   nodeEnter.append("circle")
-    .attr("r", 3);
-
-  nodeEnter.append("text")
-    .attr("class", "nodetext")
-    .attr("dx", 5)
-    .attr("dy", ".35em")
-    .text(function(d) {
-      return d.name;
-    });
+    .attr("r", 25/parseFloat(rT));
 
   node.exit().remove();
 
@@ -228,20 +243,10 @@ function updateThreshold() {
 function updateDate() {
   d3.selectAll(".link")
     .attr("visibility", "hidden");
-  d3.selectAll(".date" + thisDate)
+  d3.selectAll(".node")
+    .attr("visibility", "hidden");
+  d3.selectAll(".date" + thisYear)
     .attr("visibility", "visible");
-}
-
-function formatDate(d){
-  var pad = "0";
-  var d = new Date(d*1000);
-  var monthString = "" + (d.getMonth()+1);
-  if (monthString.length > 1) {
-    pad = "";
-  }
-  var thisMonth = pad + monthString;
-  var thisYear = d.getFullYear();
-  thisDate = "" + thisYear + thisMonth;
 }
 
 function tick() {
@@ -253,51 +258,51 @@ function tick() {
   node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 }
 
-//function dblclick(d) {
-//  d3.select(this).classed("fixed", d.fixed = false);
-//}
-//
 function dragstart(d) {
   d3.select(this).classed("fixed", d.fixed = true);
 }
 
 function makeSlider(){
-  $(function() {
-    var currentValue = $('#currentValue');
-    var maxTime = maxDate.getTime()/1000;
-    var minTime = minDate.getTime()/1000;
-    $("#date-slider").slider({
-      max: maxTime,
-      min: minTime,
-      slide: function(event, ui) {
-        formatDate(ui.value);
-        currentValue.html(thisDate);
-        updateDate();
-      },
-      pips: {
-        mode: 'range',
-        density: 3
-      }
-    });
+  var slider = document.getElementById('date-slider');
+
+  console.log(minYear + ", " + maxYear);
+  noUiSlider.create(slider, {
+    start: 0,
+    step: 1,
+    range: {
+      'min': [minYear],
+      'max': [maxYear]
+    },
+    pips: {
+      mode: 'steps',
+      density: '2',
+    }
+  });
+  slider.noUiSlider.on('change', function(){
+    thisYear = Math.floor(slider.noUiSlider.get());
+    updateDate();
   });
 }
 
 function makeThresholdSlider(){
-  $(function() {
-    var currentThreshold = $('#currentThreshold');
-    $("#threshold-slider").slider({
-      max: numNodes,
-      min: 0,
-      slide: function(event, ui) {
-        threshold = ui.value
-        currentThreshold.html(threshold);
-        updateThreshold();
-      },
-      pips: {
-        mode: 'range',
-        density: 3
-      }
-    });
+  var thresholdSlider = document.getElementById('threshold-slider');
+
+  noUiSlider.create(thresholdSlider, {
+    start: 100,
+    step: 10,
+    range: {
+      'min': [0],
+      'max': [numNodes]
+    },
+    pips: {
+      mode: 'count',
+      values: 10,
+      density: 2,
+    }
+  });
+  thresholdSlider.noUiSlider.on('change', function(){
+    threshold = Math.floor(thresholdSlider.noUiSlider.get());
+    updateThreshold();
   });
 }
 </script>

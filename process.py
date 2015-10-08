@@ -4,9 +4,7 @@ import re
 import operator
 import sys
 
-top_n = 20
-
-data = []
+data = set()
 
 class Link:
     def __init__(self, date, source, target, count): 
@@ -16,12 +14,14 @@ class Link:
             self.count=count
 
 with open('raw.txt') as fp:
+
   for line in fp:
     temp = re.split("\t", line.rstrip())
     arr = []
     for idx, val in enumerate(temp):
       arr.append(val.replace(" ", ""))
-    data.append(Link(arr[0], arr[1], arr[2], int(arr[3])))
+    link = Link(arr[0][:4], arr[1], arr[2], int(arr[3]))
+    data.add(link)
 
 sys.stdout.write("date")
 sys.stdout.write(",")
