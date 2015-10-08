@@ -97,9 +97,10 @@ var force = d3.layout.force()
 var drag = force.drag()
   .on("dragstart", dragstart);
 
-var svg = d3.select("#graph").append("svg")
+var graph = d3.select("#graph");
+var svg = graph.append("svg")
   .attr("width", width)
-  .attr("height", height)
+  .attr("height", height);
 
 var link = svg.selectAll(".link");
 var node = svg.selectAll(".node");
@@ -121,17 +122,17 @@ var maxYear = 2009;
 
 var thisYear = 2005;
 
-var loading = svg.append("text")
-      .attr("x", width / 2)
-      .attr("y", height / 2)
-      .attr("dy", ".35em")
-      .style("text-anchor", "middle")
-      .text("Simulating. One moment please…");
+var loading = graph.append("text")
+    .attr("x", width / 2)
+    .attr("y", height / 2)
+    .attr("dy", ".35em")
+    .style("text-anchor", "middle")
+    .text("Simulating. One moment please…");
 
 var tip = d3.tip()
    .attr('class', 'd3-tip')
    .offset([-10, 0])
-  .html(function(d) { return "<div class='popup-tip'>" + d.name + "</div>"; });
+   .html(function(d) { return "<div class='popup-tip'>" + d.name + "</div>"; });
 svg.call(tip);
 
 d3.csv("nodes.csv", function(error, data){
@@ -146,7 +147,7 @@ d3.csv("nodes.csv", function(error, data){
 
 function loadLinks(){
   d3.csv("links.csv", function(error, data){
-    makeSlider();
+    makeDateSlider();
     makeThresholdSlider();
     maxLinks = data[0].count;
     allLinks = data.slice();
@@ -166,7 +167,8 @@ function loadLinks(){
 
 function start(){
   setTimeout(function() {
-    loading.attr("visibility", "visible");
+    svg.attr("visibility", "hidden");
+    loading.style({"visibility": "visible"});
     var links = [];
     var nodes = {};
 
@@ -197,7 +199,9 @@ function start(){
 
    for(var i=25; i>0; --i) force.tick();
    force.stop();
-   loading.attr("visibility", "hidden");
+   updateDate();
+   loading.style({"visibility": "hidden"});
+   svg.style({"visibility": "visible"});
   });
 }
 
@@ -210,13 +214,13 @@ function update(){
       var s = "node ";
       nodesToLinks[d.name].forEach(function(l) { dates.add(l.date); });
       dates.forEach(function(year) { s += "date" + year + " "; });
-      console.log(s);
       return s;
     })
     .attr("visibility", "visible")
     .on("mouseover", tip.show)
     .on("mouseout", tip.hide)
-    .call(force.drag);
+    .on("dblclick", dblclick)
+    .call(drag);
 
   nodeEnter.append("circle")
     .attr("r", 25/parseFloat(rT));
@@ -262,10 +266,12 @@ function dragstart(d) {
   d3.select(this).classed("fixed", d.fixed = true);
 }
 
-function makeSlider(){
-  var slider = document.getElementById('date-slider');
+function dblclick(d) {
+    d3.select(this).classed("fixed", d.fixed = false);
+}
 
-  console.log(minYear + ", " + maxYear);
+function makeDateSlider(){
+  var slider = document.getElementById('date-slider');
   noUiSlider.create(slider, {
     start: 0,
     step: 1,
@@ -286,7 +292,6 @@ function makeSlider(){
 
 function makeThresholdSlider(){
   var thresholdSlider = document.getElementById('threshold-slider');
-
   noUiSlider.create(thresholdSlider, {
     start: 100,
     step: 10,
