@@ -46,6 +46,17 @@ body {
   font-family: sans-serif;
 }
 
+.noUi-handle{
+    width: 10px;
+    height: 5px;
+    background: #fff
+}
+
+.noUi-target{
+    height: 10px;
+    margin: 10px;
+}
+
 </style>
 </head>
 <body>
@@ -64,14 +75,12 @@ body {
   </div>
   <div class="row">
     <div id="display">
-      <div id="graph">
-      </div>
+      <div id="graph"></div>
       <p>This visualization was created with d3, based on <a href="http://bl.ocks.org/mbostock/3750558">this example</a> and <a href="http://bl.ocks.org/mbostock/2706022">this example</a>. The raw data for this visualization comes from the output of a <a href="https://github.com/lintool/warcbase/wiki/Pig:-Analysis-of-Site-Link-Structure">Pig script</a>.</p>
     </div>
   </div>
 </div>
 
-<!-- Latest compiled and minified JavaScript -->
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
@@ -122,7 +131,7 @@ var maxYear = 2009;
 
 var thisYear = 2005;
 
-var loading = graph.append("text")
+var loading = svg.append("text")
     .attr("x", width / 2)
     .attr("y", height / 2)
     .attr("dy", ".35em")
@@ -158,7 +167,10 @@ function loadLinks(){
       l.target = nodesByName[l.target]
       nodesToLinks[sourceString].push(l);
       if (sourceString != targetString) {
-        nodesToLinks[targetString].push(l);
+        var l2 = JSON.parse(JSON.stringify(l));
+        l2.source = l.target;
+        l2.target = l.source;
+        nodesToLinks[targetString].push(l2);
       }
     });
     start();
@@ -167,8 +179,6 @@ function loadLinks(){
 
 function start(){
   setTimeout(function() {
-    svg.attr("visibility", "hidden");
-    loading.style({"visibility": "visible"});
     var links = [];
     var nodes = {};
 
@@ -199,9 +209,8 @@ function start(){
 
    for(var i=25; i>0; --i) force.tick();
    force.stop();
-   updateDate();
    loading.style({"visibility": "hidden"});
-   svg.style({"visibility": "visible"});
+   graph.style({"visibility": "visible"});
   });
 }
 
@@ -216,7 +225,6 @@ function update(){
       dates.forEach(function(year) { s += "date" + year + " "; });
       return s;
     })
-    .attr("visibility", "visible")
     .on("mouseover", tip.show)
     .on("mouseout", tip.hide)
     .on("dblclick", dblclick)
@@ -233,14 +241,16 @@ function update(){
     .attr("stroke-opacity", function(d) {
       return Math.log(d.count)/Math.log(maxLinks);
     })
-    .attr("class", function(d) { return "link date" + d.date; })
-    .attr("visibility", "visible");
+    .attr("class", function(d) { return "link date" + d.date; });
 
   link.exit().remove();
+  updateDate();
 }
 
 function updateThreshold() {
   rT = Math.log(threshold);
+  graph.style({"visibility": "hidden"});
+  loading.style({"visibility": "visible"});
   start();
 }
 
