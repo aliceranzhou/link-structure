@@ -139,11 +139,22 @@ var maxYear = 2009;
 
 var thisYear = 2005;
 
-var tip = d3.tip()
+var nodetip = d3.tip()
    .attr('class', 'd3-tip')
    .offset([-10, 0])
    .html(function(d) { return "<div class='popup-tip'>" + d.name + "</div>"; });
-svg.call(tip);
+
+var linktip = d3.tip()
+   .attr('class', 'd3-tip')
+   .offset([-10, 0])
+  .html(function(l) { return "<div class='popup-tip'>" + "Link" + "<br>"
+    + "source: " + l.source.name + "<br>"
+    + "target: " + l.target.name + "<br>"
+    + "year: " + l.date + "<br>"
+    + "count: " + l.count + "<br>"
+    + "</div>"; });
+svg.call(nodetip);
+svg.call(linktip);
 
 d3.csv("nodes.csv", function(error, data){
   allNodes = data.slice();
@@ -213,8 +224,17 @@ function start(){
 }
 
 function update(){
-  node = node.data(force.nodes());
 
+  link = link.data(force.links());
+
+  link.enter().append("line")
+    .attr("stroke-opacity", function(d) {
+      return Math.log(d.count)/Math.log(maxLinks);
+    })
+    .attr("class", function(d) { return "link date" + d.date; })
+    .on("mouseover", linktip.show)
+    .on("mouseout", linktip.hide);
+  node = node.data(force.nodes());
   var nodeEnter = node.enter().append("g")
     .attr("class", function(d) {
       var dates = new Set();
@@ -223,23 +243,15 @@ function update(){
       dates.forEach(function(year) { s += "date" + year + " "; });
       return s;
     })
-    .on("mouseover", tip.show)
-    .on("mouseout", tip.hide)
+    .on("mouseover", nodetip.show)
+    .on("mouseout", nodetip.hide)
     .on("dblclick", dblclick)
     .call(drag);
 
   nodeEnter.append("circle")
-    .attr("r", 25/parseFloat(rT));
+    .attr("r", 15/parseFloat(rT));
 
   node.exit().remove();
-
-  link = link.data(force.links());
-
-  link.enter().append("line")
-    .attr("stroke-opacity", function(d) {
-      return Math.log(d.count)/Math.log(maxLinks);
-    })
-    .attr("class", function(d) { return "link date" + d.date; });
 
   link.exit().remove();
   updateDate();
