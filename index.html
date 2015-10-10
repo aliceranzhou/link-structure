@@ -7,7 +7,6 @@
 <!-- Optional theme -->
 <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
 <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon"> 
-<link rel="stylesheet" type="text/css" media="screen" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.2/themes/base/jquery-ui.css">
 <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/css/bootstrap2/bootstrap-switch.min.css">
 
 <link href="assets/nouislider.min.css" rel="stylesheet">
@@ -35,6 +34,11 @@ body {
 
 #graph {
   height:80vh;
+}
+
+.loading{
+  font-size: 20px;
+  font-family: sans-serif;
 }
 
 .popup-tip{
@@ -84,9 +88,8 @@ body {
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
-<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.9.2/jquery-ui.min.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-switch/3.3.2/js/bootstrap-switch.min.js"></script>
 <script src="assets/nouislider.min.js"></script>
+<script src="assets/spin.min.js"></script>
 <script src="http://labratrevenge.com/d3-tip/javascripts/d3.tip.v0.6.3.js"></script>
 <script>
 
@@ -111,6 +114,12 @@ var svg = graph.append("svg")
   .attr("width", width)
   .attr("height", height);
 
+var loading = svg.append("text")
+  .attr('x', width / 2)
+  .attr('y', height / 2)
+  .attr('class', 'loading')
+  .text("Simulating...");
+
 var link = svg.selectAll(".link");
 var node = svg.selectAll(".node");
 
@@ -130,13 +139,6 @@ var minYear = 2005;
 var maxYear = 2009;
 
 var thisYear = 2005;
-
-var loading = svg.append("text")
-    .attr("x", width / 2)
-    .attr("y", height / 2)
-    .attr("dy", ".35em")
-    .style("text-anchor", "middle")
-    .text("Simulating. One moment please…");
 
 var tip = d3.tip()
    .attr('class', 'd3-tip')
@@ -163,13 +165,14 @@ function loadLinks(){
     allLinks.forEach(function(l) {
       var sourceString = l.source;
       var targetString = l.target;
-      l.source = nodesByName[l.source]
-      l.target = nodesByName[l.target]
+      l.source = nodesByName[sourceString]
+      l.target = nodesByName[targetString]
       nodesToLinks[sourceString].push(l);
       if (sourceString != targetString) {
         var l2 = JSON.parse(JSON.stringify(l));
-        l2.source = l.target;
-        l2.target = l.source;
+        l2.source = nodesByName[targetString];
+        l2.target = nodesByName[sourceString];
+        l2.date = l.date;
         nodesToLinks[targetString].push(l2);
       }
     });
@@ -188,17 +191,14 @@ function start(){
     }
     for (var i=0; i<threshold && i<allNodes.length; ++i) {
       var n = allNodes[i];
-      n.px = i
-      n.py = i
-      var linkArray = nodesToLinks[n.name]
-      for (var j=0; j<linkArray.length; ++j){
-        var l = linkArray[j]
+      n.px = n.py = i;
+      nodesToLinks[n.name].forEach(function(l) {
         if (nodeNames.has(l.target.name)){
           if(!nodes[l.source.name]) nodes[l.source.name] = l.source
           if(!nodes[l.target.name]) nodes[l.target.name] = l.target
           links.push(l)
         }
-      }
+      });
     }
 
     force.nodes(d3.values(nodes))
@@ -209,8 +209,7 @@ function start(){
 
    for(var i=25; i>0; --i) force.tick();
    force.stop();
-   loading.style({"visibility": "hidden"});
-   graph.style({"visibility": "visible"});
+   loading.attr("visibility", "hidden");
   });
 }
 
@@ -247,10 +246,14 @@ function update(){
   updateDate();
 }
 
+d3.selection.prototype.moveToFront = function() {
+  return this.each(function(){
+    this.parentNode.appendChild(this);
+  });
+};
+
 function updateThreshold() {
   rT = Math.log(threshold);
-  graph.style({"visibility": "hidden"});
-  loading.style({"visibility": "visible"});
   start();
 }
 
@@ -316,6 +319,8 @@ function makeThresholdSlider(){
     }
   });
   thresholdSlider.noUiSlider.on('change', function(){
+    loading.moveToFront();
+    loading.attr("visibility", "visible");
     threshold = Math.floor(thresholdSlider.noUiSlider.get());
     updateThreshold();
   });
